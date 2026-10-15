@@ -52,10 +52,13 @@ pub enum ThemeKind {
     SoftDark,
     /// A low-contrast light theme: pale violet-grey surfaces, softened dark text and a periwinkle accent.
     SoftLight,
+    /// A custom dark theme based on Shades-of-purple-standard-buttons: deep royal purple surfaces,
+    /// standard button radii, vibrant gold accents and high-contrast light text.
+    ShadesOfPurple,
 }
 
 impl ThemeKind {
-    pub const ALL: [ThemeKind; 14] = [
+    pub const ALL: [ThemeKind; 15] = [
         ThemeKind::Pro,
         ThemeKind::ProMedium,
         ThemeKind::ProLightGray,
@@ -70,6 +73,7 @@ impl ThemeKind {
         ThemeKind::BreezeDark,
         ThemeKind::SoftDark,
         ThemeKind::SoftLight,
+        ThemeKind::ShadesOfPurple,
     ];
     pub fn label(self) -> &'static str {
         match self {
@@ -87,6 +91,7 @@ impl ThemeKind {
             ThemeKind::BreezeDark => "Breeze Dark",
             ThemeKind::SoftDark => "Soft Dark",
             ThemeKind::SoftLight => "Soft Light",
+            ThemeKind::ShadesOfPurple => "Shades of Purple",
         }
     }
     /// The canonical name: `ui.set {theme}` accepts it and the Window › Theme commands are
@@ -107,6 +112,7 @@ impl ThemeKind {
             ThemeKind::BreezeDark => "breezeDark",
             ThemeKind::SoftDark => "softDark",
             ThemeKind::SoftLight => "softLight",
+            ThemeKind::ShadesOfPurple => "shadesOfPurple",
         }
     }
     /// Photoshop-grammar layout (tab strips, flat panels): the four Pro brightness levels.
@@ -133,6 +139,7 @@ impl ThemeKind {
             "breezedark" | "kdedark" | "plasmadark" => Some(ThemeKind::BreezeDark),
             "softdark" => Some(ThemeKind::SoftDark),
             "softlight" => Some(ThemeKind::SoftLight),
+            "shadesofpurple" | "shadesofpurplestandardbuttons" | "purple" => Some(ThemeKind::ShadesOfPurple),
             _ => None,
         }
     }
@@ -742,6 +749,49 @@ impl Tokens {
                 caption_close_text: Color32::from_rgb(253, 246, 227),
                 scrim: Color32::from_black_alpha(110),
             },
+            // An adaptation of the Shades-of-purple GTK theme:
+            // rich purple surfaces (#25143D, #341d57, #3b2163), standard 6 px button corners,
+            // pink accent (#FF00FF) with dark button label, and high-contrast text.
+            ThemeKind::ShadesOfPurple => Tokens {
+                kind,
+                chrome: Color32::from_rgb(28, 16, 47),
+                canvas: Color32::from_rgb(21, 11, 34),
+                canvas_dot: Color32::from_rgb(45, 25, 75),
+                dock: Color32::from_rgb(37, 20, 61),
+                card: Color32::from_rgb(52, 29, 87),
+                card_border: Color32::from_rgb(21, 11, 34),
+                field: Color32::from_rgb(59, 33, 99),
+                field_border: Color32::from_rgb(70, 40, 115),
+                hover: Color32::from_rgb(67, 38, 112),
+                pressed: Color32::from_rgb(77, 44, 128),
+                text: Color32::WHITE,
+                text_dim: Color32::from_rgb(215, 210, 222),
+                text_faint: Color32::from_rgb(175, 168, 186),
+                icon: Color32::from_rgb(240, 235, 245),
+                accent: Color32::from_rgb(255, 0, 255),
+                accent_soft: Color32::from_rgba_unmultiplied(255, 0, 255, 48),
+                accent_border: Color32::from_rgba_unmultiplied(255, 0, 255, 160),
+                accent_text: Color32::from_rgb(255, 72, 255),
+                separator: Color32::from_rgb(21, 11, 34),
+                shadow: Color32::from_black_alpha(150),
+                primary_bg: Color32::from_rgb(255, 0, 255),
+                primary_text: Color32::from_rgb(30, 30, 63),
+                danger: Color32::from_rgb(255, 98, 126),
+                warning: Color32::from_rgb(255, 0, 255),
+                radius_sm: 4.0,
+                radius: 6.0,
+                radius_lg: 8.0,
+                bevel: false,
+                pro: false,
+                round_chips: true,
+                tab_strip: Color32::TRANSPARENT,
+                row_selected: Color32::TRANSPARENT,
+                histogram_bg: Color32::from_rgb(21, 11, 34),
+                histogram_level: 235,
+                caption_close: Color32::from_rgb(224, 0, 37),
+                caption_close_text: Color32::WHITE,
+                scrim: Color32::from_black_alpha(120),
+            },
         }
     }
 
@@ -818,6 +868,7 @@ impl Tokens {
                 | ThemeKind::AdwaitaDark
                 | ThemeKind::BreezeDark
                 | ThemeKind::SoftDark
+                | ThemeKind::ShadesOfPurple
         )
     }
 }
@@ -1376,6 +1427,43 @@ mod tests {
             }
             assert!(contrast(t.caption_close_text, t.caption_close) >= 4.5, "{kind:?}: close button glyph");
         }
+    }
+
+    #[test]
+    fn shades_of_purple_theme_parses_and_meets_contrast() {
+        let kind = ThemeKind::ShadesOfPurple;
+        assert_eq!(ThemeKind::from_name("shadesOfPurple"), Some(kind));
+        assert_eq!(ThemeKind::from_name("Shades of Purple"), Some(kind));
+        assert_eq!(ThemeKind::from_name("shades-of-purple"), Some(kind));
+        assert_eq!(ThemeKind::from_name("shades_of_purple_standard_buttons"), Some(kind));
+        assert_eq!(ThemeKind::from_name("purple"), Some(kind));
+        assert!(ThemeKind::ALL.contains(&kind));
+        let t = Tokens::for_kind(kind);
+        assert_eq!(t.kind, kind);
+        assert!(t.dark());
+        assert!(!t.pro && !t.bevel);
+        assert_eq!(t.radius, 6.0); // 6 px standard button corners
+
+        let resting = [t.chrome, t.canvas, t.dock, t.card, t.field];
+        let active = [t.hover, t.pressed];
+        for surface in resting.into_iter().chain(active) {
+            assert!(contrast(t.text, surface) >= 7.0, "text on {surface:?}");
+            assert!(contrast(t.text_dim, surface) >= 4.5, "dim text on {surface:?}");
+            assert!(contrast(t.text_faint, surface) >= 4.5, "faint text on {surface:?}");
+            assert!(contrast(t.accent_text, surface) >= 4.5, "accent text on {surface:?}");
+        }
+        for surface in resting {
+            assert!(contrast(t.danger, surface) >= 4.5, "danger on {surface:?}");
+            assert!(contrast(t.warning, surface) >= 4.5, "warning on {surface:?}");
+        }
+        for surface in active {
+            assert!(contrast(t.danger, surface) >= 3.0, "danger on {surface:?}");
+            assert!(contrast(t.warning, surface) >= 3.0, "warning on {surface:?}");
+        }
+        for k in [1.0, 0.93, 0.85] {
+            assert!(contrast(t.primary_text, t.primary_bg.gamma_multiply(k)) >= 4.5, "primary button at {k}");
+        }
+        assert!(contrast(t.caption_close_text, t.caption_close) >= 4.5, "close glyph");
     }
 }
 
